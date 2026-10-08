@@ -6,8 +6,8 @@ import statsmodels.formula.api as smf
 from sklearn.metrics import roc_curve, auc
 import re
 
-st.title("🎓 HỆ THỐNG CHẤM BÀI TỰ ĐỘNG - CHI TIẾT TỪNG CÂU")
-st.write("Hệ thống kiểm tra mã lệnh chuyên biệt cho 10 câu hỏi hồi quy logistic.")
+st.title("🎓 HỆ THỐNG CHẤM BÀI KIỂM TRA")
+st.write("Kiểm tra mã lệnh cho từng câu hỏi.")
 
 uploaded_file = st.file_uploader("Chọn file bài nộp (.ipynb)", type=["ipynb"])
 
@@ -31,7 +31,7 @@ if uploaded_file is not None:
             if match_hoten and ho_ten_tim_duoc == "Không xác định":
                 ho_ten_tim_duoc = match_hoten.group(1).strip()
         
-        st.success(f"Đã nhận diện bài làm của: **{ho_ten_tim_duoc}** - MSSV: **{mssv_tim_duoc}**")
+        st.success(f"Bài làm của: **{ho_ten_tim_duoc}** - MSSV: **{mssv_tim_duoc}**")
         
         # 2. Gom nhóm các ô code và markdown theo thứ tự xuất hiện trong bài
         code_cells = [cell.get('source', '') for cell in nb.cells if cell.cell_type == 'code'][1:] # Bỏ qua ô đầu tiên (khởi tạo dữ liệu)

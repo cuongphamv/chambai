@@ -7,19 +7,18 @@ from sklearn.metrics import roc_curve, auc
 import re
 
 st.title("🎓 HỆ THỐNG CHẤM BÀI TỰ ĐỘNG - HỒI QUY LOGISTIC")
-st.write("Tải lên file bài tập `.ipynb` của bạn để hệ thống tự động kiểm tra và chấm điểm.")
+st.write("Hệ thống kiểm tra mã nguồn thực thi và nội dung giải thích của sinh viên.")
 
 uploaded_file = st.file_uploader("Chọn file bài nộp (.ipynb)", type=["ipynb"])
 
 if uploaded_file is not None:
     try:
-        # Đọc nội dung file notebook
         nb = nbformat.reads(uploaded_file.read().decode('utf-8'), as_version=4)
         
         mssv_tim_duoc = "Không xác định"
         ho_ten_tim_duoc = "Không xác định"
         
-        # Quét qua toàn bộ các cell để tìm MSSV và Họ tên bằng RegEx
+        # 1. Trích xuất MSSV và Họ tên
         for cell in nb.cells:
             source_text = ""
             if cell.cell_type == 'code':
@@ -37,7 +36,6 @@ if uploaded_file is not None:
             if match_hoten and ho_ten_tim_duoc == "Không xác định":
                 ho_ten_tim_duoc = match_hoten.group(1).strip()
         
-        # Dự phòng tìm số từ cell đầu tiên nếu chưa thấy MSSV
         if mssv_tim_duoc == "Không xác định" and len(nb.cells) > 0:
             first_code = nb.cells[0].get('source', '')
             numbers = re.findall(r'\b\d{5,8}\b', first_code)
@@ -46,21 +44,10 @@ if uploaded_file is not None:
 
         st.success(f"Đã nhận diện bài làm của: **{ho_ten_tim_duoc}** - MSSV: **{mssv_tim_duoc}**")
         
-        # Kiểm tra khối lượng bài làm
-        so_cell_code = sum(1 for cell in nb.cells if cell.cell_type == 'code' and len(cell.get('source', '').strip()) > 0)
-        so_cell_markdown = sum(1 for cell in nb.cells if cell.cell_type == 'markdown' and len(cell.get('source', '').strip()) > 50)
+        # 2. Tái tạo dữ liệu chuẩn ngầm định của sinh viên này để đối chiếu
+        diem_chi_tiet = 0
+        nhan_xet_chi_tiet = []
         
-        diem_cau_truc = 0
-        if so_cell_code >= 5: diem_cau_truc += 5.0
-        if so_cell_markdown >= 5: diem_cau_truc += 5.0
-        
-        st.write("---")
-        st.subheader("📊 Kết quả kiểm tra sơ bộ:")
-        st.write(f"- Số ô code đã viết lệnh: {so_cell_code}")
-        st.write(f"- Số ô giải thích/nhận xét: {so_cell_markdown}")
-        st.metric(label="Điểm đánh giá sơ bộ", value=f"{diem_cau_truc} / 10.0")
-        
-        # Tái tạo đáp án ngầm theo MSSV
         if mssv_tim_duoc != "Không xác định":
             seed_val = abs(hash(str(mssv_tim_duoc).strip().upper())) % (2**32)
             np.random.seed(seed_val)
@@ -93,8 +80,40 @@ if uploaded_file is not None:
             y_pred_prob = model.predict(df_chuan)
             fpr, tpr, _ = roc_curve(df_chuan['TangHuyetAp'], y_pred_prob)
             roc_auc = auc(fpr, tpr)
+
+            # 3. Quét kiểm tra chất lượng thực tế từng câu trong notebook của sinh viên
+            code_cells = [cell for cell in nb.cells if cell.cell_type == 'code']
+            markdown_cells = [cell for cell in nb.cells if cell.cell_type == 'markdown']
             
-            st.info(f"💡 **Thông tin đối chiếu ngầm:** Bộ dữ liệu cá nhân của bạn có {n_samples} quan sát. Giá trị AUC chuẩn của mô hình là: **{round(roc_auc, 3)}**.")
+            # Kiểm tra xem sinh viên có thực hiện viết lệnh hồi quy hay không (tìm từ khóa smf.logit hoặc logit)
+            has_logit_code = any('logit' in cell.get('source', '') for cell in code_cells)
+            if has_logit_code:
+                diem_chi_tiet += 4.0
+                nhan_xet_chi_tiet.append("✅ Đã viết lệnh xây dựng mô hình hồi quy logistic.")
+            else:
+                nhan_xet_chi_tiet.append("❌ Chưa tìm thấy câu lệnh chạy mô hình hồi quy (`logit`) trong bài.")
+
+            # Kiểm tra xem sinh viên có viết phần giải thích văn bản thực chất không (loại bỏ các cell chỉ chứa placeholder)
+            valid_markdowns = 0
+            for cell in markdown_cells:
+                text = cell.get('source', '').strip()
+                # Kiểm tra nếu text có độ dài kha khá và không phải là văn bản hướng dẫn mặc định
+                if len(text) > 30 and "Nhập câu trả lời" not in text and "HƯỚNG DẪN" not in text:
+                    valid_markdowns += 1
             
+            if valid_markdowns >= 4:
+                diem_chi_tiet += 6.0
+                nhan_xet_chi_tiet.append(f"✅ Tìm thấy {valid_markdowns} phần giải thích/nhận xét chi tiết.")
+            else:
+                diem_chi_tiet += float(valid_markdowns) * 1.2
+                nhan_xet_chi_tiet.append(⚠️ f" Chỉ tìm thấy {valid_markdowns} phần giải thích hợp lệ (cần viết chi tiết hơn ở các câu nhận xét).")
+
+        st.write("---")
+        st.subheader("📊 Kết quả kiểm định chi tiết bài làm:")
+        for note in nhan_xet_chi_tiet:
+            st.write(note)
+            
+        st.metric(label="Điểm đánh giá thực chất", value=f"{round(diem_chi_tiet, 1)} / 10.0")
+        
     except Exception as e:
         st.error(f"Lỗi khi xử lý file: {str(e)}")

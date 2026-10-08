@@ -85,7 +85,6 @@ if uploaded_file is not None:
             code_cells = [cell for cell in nb.cells if cell.cell_type == 'code']
             markdown_cells = [cell for cell in nb.cells if cell.cell_type == 'markdown']
             
-            # Kiểm tra xem sinh viên có thực hiện viết lệnh hồi quy hay không (tìm từ khóa smf.logit hoặc logit)
             has_logit_code = any('logit' in cell.get('source', '') for cell in code_cells)
             if has_logit_code:
                 diem_chi_tiet += 4.0
@@ -93,11 +92,9 @@ if uploaded_file is not None:
             else:
                 nhan_xet_chi_tiet.append("❌ Chưa tìm thấy câu lệnh chạy mô hình hồi quy (`logit`) trong bài.")
 
-            # Kiểm tra xem sinh viên có viết phần giải thích văn bản thực chất không (loại bỏ các cell chỉ chứa placeholder)
             valid_markdowns = 0
             for cell in markdown_cells:
                 text = cell.get('source', '').strip()
-                # Kiểm tra nếu text có độ dài kha khá và không phải là văn bản hướng dẫn mặc định
                 if len(text) > 30 and "Nhập câu trả lời" not in text and "HƯỚNG DẪN" not in text:
                     valid_markdowns += 1
             
@@ -106,7 +103,7 @@ if uploaded_file is not None:
                 nhan_xet_chi_tiet.append(f"✅ Tìm thấy {valid_markdowns} phần giải thích/nhận xét chi tiết.")
             else:
                 diem_chi_tiet += float(valid_markdowns) * 1.2
-                nhan_xet_chi_tiet.append(⚠️ f" Chỉ tìm thấy {valid_markdowns} phần giải thích hợp lệ (cần viết chi tiết hơn ở các câu nhận xét).")
+                nhan_xet_chi_tiet.append(f"⚠️ Chỉ tìm thấy {valid_markdowns} phần giải thích hợp lệ (cần viết chi tiết hơn ở các câu nhận xét).")
 
         st.write("---")
         st.subheader("📊 Kết quả kiểm định chi tiết bài làm:")
